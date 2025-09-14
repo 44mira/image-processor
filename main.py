@@ -2,15 +2,13 @@ import sys
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
-    QMenuBar,
-    QMenu,
     QFileDialog,
     QMessageBox,
     QLabel,
+    QStatusBar,
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap, QAction
-from PIL import Image
 import os
 
 
@@ -23,6 +21,7 @@ class ImageViewer(QMainWindow):
         # Create UI
         self.create_menu()
         self.create_central_widget()
+        self.create_info_bar()
 
     def create_menu(self):
         menubar = self.menuBar()
@@ -40,6 +39,11 @@ class ImageViewer(QMainWindow):
 
         self.setCentralWidget(self.image_label)
 
+    def create_info_bar(self):
+        self.info_bar = QStatusBar()
+        self.info_bar.showMessage("Ready")
+        self.setStatusBar(self.info_bar)
+        
     def open_image(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
