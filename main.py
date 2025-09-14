@@ -6,10 +6,53 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QLabel,
     QStatusBar,
+    QWidget,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QAction
 import os
+
+
+class ImageLabel(QLabel):
+    # Custom signal: emit coordinates + color
+    pixelHovered = pyqtSignal(int, int, int, int, int)
+
+    def __init__(self):
+        super().__init__()
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet("background-color: gray;")
+        self.setMouseTracking(True)
+        self.image = None  # QImage backing for pixel lookup
+
+    def setImage(self, pixmap):
+        self.setPixmap(pixmap)
+        self.image = pixmap.toImage()
+
+    def mouseMoveEvent(self, event):
+        if self.image is not None and self.pixmap() is not None:
+            # Scale mapping (like before)
+            scaled_pixmap = self.pixmap().scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+
+            x_ratio = self.image.width() / scaled_pixmap.width()
+            y_ratio = self.image.height() / scaled_pixmap.height()
+
+            # Center offset
+            x_offset = (self.width() - scaled_pixmap.width()) // 2
+            y_offset = (self.height() - scaled_pixmap.height()) // 2
+
+            x = int((event.pos().x() - x_offset) * x_ratio)
+            y = int((event.pos().y() - y_offset) * y_ratio)
+
+            if 0 <= x < self.image.width() and 0 <= y < self.image.height():
+                color = self.image.pixelColor(x, y)
+                # Emit RGB + coords
+                self.pixelHovered.emit(x, y, color.red(), color.green(), color.blue())
+        super().mouseMoveEvent(event)
 
 
 class ImageViewer(QMainWindow):
@@ -32,18 +75,20 @@ class ImageViewer(QMainWindow):
         file_menu.addAction(open_action)
 
     def create_central_widget(self):
-        # Create label to hold image, centered
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet("background-color: gray;")
+        central_widget = QWidget()
+        layout = QVBoxLayout(central_widget)
 
-        self.setCentralWidget(self.image_label)
+        self.image_label = ImageLabel()
+        self.image_label.pixelHovered.connect(self.update_info_bar)
+        layout.addWidget(self.image_label, stretch=1)
+
+        self.setCentralWidget(central_widget)
 
     def create_info_bar(self):
         self.info_bar = QStatusBar()
         self.info_bar.showMessage("Ready")
         self.setStatusBar(self.info_bar)
-        
+
     def open_image(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self,
@@ -64,15 +109,17 @@ class ImageViewer(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation,
                 )
 
-                self.image_label.setPixmap(scaled_pixmap)
+                self.image_label.setImage(scaled_pixmap)
 
-                # Update window title
                 self.setWindowTitle(
                     f"Simple Image Viewer - {os.path.basename(file_path)}"
                 )
 
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to open image: {str(e)}")
+
+    def update_info_bar(self, x, y, r, g, b):
+        self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
 
 
 if __name__ == "__main__":
