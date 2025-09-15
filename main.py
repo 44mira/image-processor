@@ -1,17 +1,10 @@
-import sys
-from PyQt6.QtWidgets import (
-    QApplication,
-    QMainWindow,
-    QFileDialog,
-    QMessageBox,
-    QLabel,
-    QStatusBar,
-    QWidget,
-    QVBoxLayout,
-)
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap, QAction
 import os
+import sys
+
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QPixmap
+from PyQt6.QtWidgets import (QApplication, QFileDialog, QLabel, QMainWindow,
+                             QMessageBox, QStatusBar, QVBoxLayout, QWidget)
 
 
 class ImageLabel(QLabel):
@@ -29,7 +22,9 @@ class ImageLabel(QLabel):
         self.setPixmap(pixmap)
         self.image = pixmap.toImage()
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, ev):
+        assert ev is not None
+
         if self.image is not None and self.pixmap() is not None:
             # Scale mapping (like before)
             scaled_pixmap = self.pixmap().scaled(
@@ -45,14 +40,14 @@ class ImageLabel(QLabel):
             x_offset = (self.width() - scaled_pixmap.width()) // 2
             y_offset = (self.height() - scaled_pixmap.height()) // 2
 
-            x = int((event.pos().x() - x_offset) * x_ratio)
-            y = int((event.pos().y() - y_offset) * y_ratio)
+            x = int((ev.pos().x() - x_offset) * x_ratio)
+            y = int((ev.pos().y() - y_offset) * y_ratio)
 
             if 0 <= x < self.image.width() and 0 <= y < self.image.height():
                 color = self.image.pixelColor(x, y)
                 # Emit RGB + coords
                 self.pixelHovered.emit(x, y, color.red(), color.green(), color.blue())
-        super().mouseMoveEvent(event)
+        super().mouseMoveEvent(ev)
 
 
 class ImageViewer(QMainWindow):
@@ -68,7 +63,10 @@ class ImageViewer(QMainWindow):
 
     def create_menu(self):
         menubar = self.menuBar()
+        assert menubar is not None
+
         file_menu = menubar.addMenu("File")
+        assert file_menu is not None
 
         open_action = QAction("Open New Image File", self)
         open_action.triggered.connect(self.open_image)
