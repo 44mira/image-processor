@@ -3,8 +3,16 @@ import sys
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QPixmap
-from PyQt6.QtWidgets import (QApplication, QFileDialog, QLabel, QMainWindow,
-                             QMessageBox, QStatusBar, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QApplication,
+    QFileDialog,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ImageLabel(QLabel):
@@ -46,7 +54,13 @@ class ImageLabel(QLabel):
             if 0 <= x < self.image.width() and 0 <= y < self.image.height():
                 color = self.image.pixelColor(x, y)
                 # Emit RGB + coords
-                self.pixelHovered.emit(x, y, color.red(), color.green(), color.blue())
+                self.pixelHovered.emit(
+                    x,
+                    y,
+                    color.red(),
+                    color.green(),
+                    color.blue(),
+                )
         super().mouseMoveEvent(ev)
 
 
@@ -92,15 +106,21 @@ class ImageViewer(QMainWindow):
             self,
             "Open New Image File",
             "",
-            "Image files (*.png *.jpg *.jpeg *.gif *.bmp *.tiff *.webp);;All files (*)",
+            "Image files"
+            "(*.png *.jpg *.jpeg *.gif *.bmp *.tiff *.webp *.pcx *.PCX)"
+            ";;All files (*)",
         )
+
+        if file_path[-4:].lower() == ".pcx":
+            pass  # TODO: process pcx
 
         if file_path:
             try:
                 # Load image
                 pixmap = QPixmap(file_path)
 
-                # Scale image to fit within the window while maintaining aspect ratio
+                # Scale image to fit within the window while maintaining
+                # aspect ratio
                 scaled_pixmap = pixmap.scaled(
                     self.image_label.size(),
                     Qt.AspectRatioMode.KeepAspectRatio,
@@ -114,7 +134,11 @@ class ImageViewer(QMainWindow):
                 )
 
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to open image: {str(e)}")
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to open image: {str(e)}",
+                )
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
