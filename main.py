@@ -111,7 +111,7 @@ class ImageViewer(QMainWindow):
             ";;All files (*)",
         )
 
-        if file_path.lower().endswith(".pcx"):
+        if file_path[-4:].lower() == ".pcx":
             pass  # TODO: process pcx
 
         if file_path:
