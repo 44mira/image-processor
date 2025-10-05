@@ -106,11 +106,12 @@ class ImageViewer(QMainWindow):
             self,
             "Open New Image File",
             "",
-            "Image files (*.png *.jpg *.jpeg *.gif *.bmp *.tiff *.webp *.pcx)"
+            "Image files"
+            "(*.png *.jpg *.jpeg *.gif *.bmp *.tiff *.webp *.pcx *.PCX)"
             ";;All files (*)",
         )
 
-        if file_path.endswith(".pcx"):
+        if file_path.lower().endswith(".pcx"):
             pass  # TODO: process pcx
 
         if file_path:
