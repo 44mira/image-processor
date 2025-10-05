@@ -6,9 +6,11 @@ from PyQt6.QtGui import QAction, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QFrame,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSplitter,
     QStatusBar,
     QVBoxLayout,
     QWidget,
@@ -64,15 +66,34 @@ class ImageLabel(QLabel):
         super().mouseMoveEvent(ev)
 
 
+class SidebarInfoSuite(QFrame):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.setStyleSheet(
+            "background-color: #a0a0a0; border-left: 2px solid black",
+        )
+
+
 class ImageViewer(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Simple Image Viewer")
         self.setGeometry(100, 100, 800, 600)
 
-        # Create UI
         self.create_menu()
-        self.create_central_widget()
+
+        central_widget = self.create_central_widget()
+        sidebar = self.create_sidebar_widget()
+
+        splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        splitter.addWidget(central_widget)
+        splitter.addWidget(sidebar)
+
+        proportions = [600, 200]
+        splitter.setSizes(proportions)
+        self.setCentralWidget(splitter)
+
         self.create_info_bar()
 
     def create_menu(self):
@@ -86,7 +107,7 @@ class ImageViewer(QMainWindow):
         open_action.triggered.connect(self.open_image)
         file_menu.addAction(open_action)
 
-    def create_central_widget(self):
+    def create_central_widget(self) -> QWidget:
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
 
@@ -94,7 +115,12 @@ class ImageViewer(QMainWindow):
         self.image_label.pixelHovered.connect(self.update_info_bar)
         layout.addWidget(self.image_label, stretch=1)
 
-        self.setCentralWidget(central_widget)
+        return central_widget
+
+    def create_sidebar_widget(self) -> SidebarInfoSuite:
+        sidebar = SidebarInfoSuite()
+
+        return sidebar
 
     def create_info_bar(self):
         self.info_bar = QStatusBar()
