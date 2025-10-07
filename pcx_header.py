@@ -8,8 +8,8 @@ Reference: ZSoft PCX File Format Technical Reference Manual
 """
 
 import struct
-from typing import Tuple, List, Optional
 from dataclasses import dataclass
+from typing import Self
 
 
 class PCXError(Exception):
@@ -30,6 +30,8 @@ class PCXHeader:
     PCX file header structure (128 bytes total)
 
     All multi-byte integers are stored in little-endian format.
+
+    Should be constructed using `PCXHeader.parse_pcx_header(file_name)`.
     """
 
     # Raw header fields
@@ -46,7 +48,7 @@ class PCXHeader:
     colormap: bytes  # Offset 16-63: 16-color palette (48 bytes)
     reserved: int  # Offset 64: Reserved (should be 0)
     num_planes: int  # Offset 65: Number of color planes
-    bytes_per_line: int  # Offset 66-67: Bytes per scanline per plane (always even)
+    bytes_per_line: int  # Offset 66-67: Bytes per scanline per plane (even)
     palette_type: int  # Offset 68-69: 1=color/BW, 2=grayscale
     hscreen_size: int  # Offset 70-71: Horizontal screen size
     vscreen_size: int  # Offset 72-73: Vertical screen size
@@ -64,7 +66,9 @@ class PCXHeader:
         self.color_mode = self._determine_color_mode()
 
     def _determine_color_mode(self) -> str:
-        """Determine the color mode based on bits per pixel and number of planes"""
+        """
+        Determine the color mode based on bits per pixel and number of planes
+        """
         total_bits = self.bits_per_pixel * self.num_planes
 
         if total_bits == 1:
@@ -89,7 +93,10 @@ class PCXHeader:
             4: "PC Paintbrush for Windows",
             5: "v3.0+ (includes 24-bit support)",
         }
-        return version_map.get(self.version, f"Unknown (version {self.version})")
+        return version_map.get(
+            self.version,
+            f"Unknown (version {self.version})",
+        )
 
     def get_palette_type_string(self) -> str:
         """Get human-readable palette type"""
@@ -100,7 +107,7 @@ class PCXHeader:
         else:
             return f"Unknown ({self.palette_type})"
 
-    def get_colormap_rgb(self) -> List[Tuple[int, int, int]]:
+    def get_colormap_rgb(self) -> list[tuple[int, int, int]]:
         """
         Extract the 16-color EGA palette as list of RGB tuples
 
@@ -116,7 +123,7 @@ class PCXHeader:
             palette.append((r, g, b))
         return palette
 
-    def validate(self) -> Tuple[bool, List[str]]:
+    def validate(self) -> tuple[bool, list[str]]:
         """
         Validate the PCX header
 
@@ -128,13 +135,15 @@ class PCXHeader:
         # Check manufacturer byte
         if self.manufacturer != 0x0A:
             errors.append(
-                f"Invalid manufacturer byte: 0x{self.manufacturer:02X} (expected 0x0A)"
+                f"Invalid manufacturer byte: 0x{self.manufacturer:02X} "
+                "(expected 0x0A)"
             )
 
         # Check encoding
         if self.encoding not in [0, 1]:
             errors.append(
-                f"Unsupported encoding: {self.encoding} (only 0=uncompressed and 1=RLE are supported)"
+                f"Unsupported encoding: {self.encoding} "
+                "(only 0=uncompressed and 1=RLE are supported)"
             )
 
         # Check version
@@ -165,7 +174,8 @@ class PCXHeader:
 
         if self.bytes_per_line < ((self.width * self.bits_per_pixel + 7) // 8):
             errors.append(
-                f"Bytes per line ({self.bytes_per_line}) too small for image width ({self.width})"
+                f"Bytes per line ({self.bytes_per_line}) too small for image "
+                f"width ({self.width})"
             )
 
         # Check number of planes
@@ -178,11 +188,17 @@ class PCXHeader:
         """String representation of header information"""
         is_valid, errors = self.validate()
 
+        encoding = f"Unknown ({self.encoding})"
+        if self.encoding == 0:
+            encoding = "Uncompressed"
+        elif self.encoding == 1:
+            encoding = "RLE"
+
         lines = [
             "PCX Header Information",
             "=" * 50,
             f"Version:          {self.get_version_string()}",
-            f"Encoding:         {'Uncompressed' if self.encoding == 0 else 'RLE' if self.encoding == 1 else f'Unknown ({self.encoding})'}",
+            f"Encoding:         {encoding}",
             f"Dimensions:       {self.width} x {self.height} pixels",
             f"Color Mode:       {self.color_mode}",
             f"Bits per Pixel:   {self.bits_per_pixel}",
@@ -200,59 +216,35 @@ class PCXHeader:
 
         return "\n".join(lines)
 
+    @classmethod
+    def parse_pcx_header(cls, file_path: str) -> Self:
+        """
+        Parse PCX header from a file, should be used as the main constructor.
 
-def parse_pcx_header(file_path: str) -> PCXHeader:
-    """
-    Parse PCX header from a file
+        Args:
+            file_path: Path to the PCX file
 
-    Args:
-        file_path: Path to the PCX file
+        Returns:
+            PCXHeader object containing parsed header information
 
-    Returns:
-        PCXHeader object containing parsed header information
+        Raises:
+            InvalidPCXError: If file is not a valid PCX file
+            PCXError: If file cannot be read
+        """
+        header_bytes = cls.read_pcx_header_raw(file_path)
 
-    Raises:
-        InvalidPCXError: If file is not a valid PCX file
-        IOError: If file cannot be read
-    """
-    try:
-        with open(file_path, "rb") as f:
-            header_bytes = f.read(128)
+        # Parse header using struct
+        # Format string: little-endian
+        # B = unsigned char (1 byte)
+        # H = unsigned short (2 bytes, little-endian)
+        # 48s = 48-byte string (EGA palette)
+        # 54s = 54-byte string (reserved)
 
-            if len(header_bytes) < 128:
-                raise InvalidPCXError(
-                    f"File too small: only {len(header_bytes)} bytes (need 128 for header)"
-                )
-
-            # Parse header using struct
-            # Format string: little-endian
-            # B = unsigned char (1 byte)
-            # H = unsigned short (2 bytes, little-endian)
-            # 48s = 48-byte string (EGA palette)
-            # 54s = 54-byte string (reserved)
-
+        try:
             fields = struct.unpack("<BBBBHHHHHH48sBBHHHH54s", header_bytes)
 
-            header = PCXHeader(
-                manufacturer=fields[0],
-                version=fields[1],
-                encoding=fields[2],
-                bits_per_pixel=fields[3],
-                xmin=fields[4],
-                ymin=fields[5],
-                xmax=fields[6],
-                ymax=fields[7],
-                hdpi=fields[8],
-                vdpi=fields[9],
-                colormap=fields[10],
-                reserved=fields[11],
-                num_planes=fields[12],
-                bytes_per_line=fields[13],
-                palette_type=fields[14],
-                hscreen_size=fields[15],
-                vscreen_size=fields[16],
-                filler=fields[17],
-            )
+            # initialize parsed fields
+            header = cls(*fields)
 
             # Validate the header
             is_valid, errors = header.validate()
@@ -264,24 +256,32 @@ def parse_pcx_header(file_path: str) -> PCXHeader:
 
             return header
 
-    except struct.error as e:
-        raise InvalidPCXError(f"Failed to parse header structure: {e}")
-    except IOError as e:
-        raise PCXError(f"Failed to read file: {e}")
+        except struct.error as e:
+            raise InvalidPCXError(f"Failed to parse header structure: {e}")
+        except IOError as e:
+            raise PCXError(f"Failed to read file: {e}")
 
+    @classmethod
+    def read_pcx_header_raw(cls, file_path: str) -> bytes:
+        """
+        Read raw 128-byte header from PCX file
 
-def read_pcx_header_raw(file_path: str) -> bytes:
-    """
-    Read raw 128-byte header from PCX file
+        Args:
+            file_path: Path to the PCX file
 
-    Args:
-        file_path: Path to the PCX file
+        Returns:
+            128 bytes of raw header data
+        """
+        with open(file_path, "rb") as f:
+            header_bytes = f.read(128)
+            cls._validate_header_length(header_bytes)
 
-    Returns:
-        128 bytes of raw header data
-    """
-    with open(file_path, "rb") as f:
-        header_bytes = f.read(128)
+            return header_bytes
+
+    @staticmethod
+    def _validate_header_length(header_bytes):
         if len(header_bytes) < 128:
-            raise InvalidPCXError(f"File too small: only {len(header_bytes)} bytes")
-        return header_bytes
+            raise InvalidPCXError(
+                f"File too small: only {len(header_bytes)} bytes "
+                "(need 128 for header)"
+            )
