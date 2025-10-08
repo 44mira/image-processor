@@ -12,3 +12,7 @@ dependencies = [
     "pyqt6>=6.9.1",
     "pytest>=8.4.2",
 ]
+
+[tool.isort]
+line_length = 80
+profile = "black"
