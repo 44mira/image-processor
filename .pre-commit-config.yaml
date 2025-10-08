@@ -4,6 +4,7 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
+        args: ["--line-length=80"]
 
   # linting
   - repo: https://github.com/PyCQA/flake8
