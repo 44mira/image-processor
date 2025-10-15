@@ -272,11 +272,14 @@ class PCXHeader:
         Returns:
             128 bytes of raw header data
         """
-        with open(file_path, "rb") as f:
-            header_bytes = f.read(128)
-            cls._validate_header_length(header_bytes)
+        try:
+            with open(file_path, "rb") as f:
+                header_bytes = f.read(128)
+                cls._validate_header_length(header_bytes)
 
-            return header_bytes
+                return header_bytes
+        except (IOError, OSError) as e:
+            raise PCXError(f"Failed to read file: {e}")
 
     @staticmethod
     def _validate_header_length(header_bytes):
