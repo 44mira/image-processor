@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pcx_header import PCXHeader
+
 
 class ImageLabel(QLabel):
     # Custom signal: emit coordinates + color
@@ -111,34 +113,42 @@ class ImageViewer(QMainWindow):
             ";;All files (*)",
         )
 
+        if not file_path:
+            return
+
         if file_path[-4:].lower() == ".pcx":
-            pass  # TODO: process pcx
+            self.open_pcx(file_path)
+            return
 
-        if file_path:
-            try:
-                # Load image
-                pixmap = QPixmap(file_path)
+        try:
+            # Load image
+            pixmap = QPixmap(file_path)
 
-                # Scale image to fit within the window while maintaining
-                # aspect ratio
-                scaled_pixmap = pixmap.scaled(
-                    self.image_label.size(),
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
+            # Scale image to fit within the window while maintaining
+            # aspect ratio
+            scaled_pixmap = pixmap.scaled(
+                self.image_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
 
-                self.image_label.setImage(scaled_pixmap)
+            self.image_label.setImage(scaled_pixmap)
 
-                self.setWindowTitle(
-                    f"Simple Image Viewer - {os.path.basename(file_path)}"
-                )
+            self.setWindowTitle(
+                f"Simple Image Viewer - {os.path.basename(file_path)}"
+            )
 
-            except Exception as e:
-                QMessageBox.critical(
-                    self,
-                    "Error",
-                    f"Failed to open image: {str(e)}",
-                )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to open image: {str(e)}",
+            )
+
+    def open_pcx(self, file_path):
+        PCXHeader.parse_pcx_header(file_path)
+
+        # TODO: integration
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
