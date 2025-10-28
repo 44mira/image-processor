@@ -195,8 +195,6 @@ class PCXHeader:
             encoding = "RLE"
 
         lines = [
-            "PCX Header Information",
-            "=" * 50,
             f"Version:          {self.get_version_string()}",
             f"Encoding:         {encoding}",
             f"Dimensions:       {self.width} x {self.height} pixels",
@@ -288,3 +286,67 @@ class PCXHeader:
                 f"File too small: only {len(header_bytes)} bytes "
                 "(need 128 for header)"
             )
+
+
+def read_256_color_palette(file_path: str) -> list[int]:
+    """
+    Read the 256-color VGA palette from an 8-bit PCX file.
+
+    For 256-color PCX files, the palette is stored at the end of the file:
+    - Last 769 bytes of the file
+    - Byte 0: Palette marker (0x0C)
+    - Bytes 1-768: RGB triplets for 256 colors (3 bytes per color)
+
+    Args:
+        file_path: Path to the PCX file
+
+    Returns:
+        List of 768 integers (R, G, B values for 256 colors in sequence)
+        Format: [R0, G0, B0, R1, G1, B1, ..., R255, G255, B255]
+        Each value is 0-255
+
+    Raises:
+        PCXError: If file cannot be read
+        InvalidPCXError: If palette marker is missing or data is incomplete
+    """
+    try:
+        with open(file_path, "rb") as f:
+            # Get file size
+            f.seek(0, 2)  # Seek to end
+            file_size = f.tell()
+
+            # Check if file is large enough to contain palette
+            if file_size < 128 + 769:
+                raise InvalidPCXError(
+                    f"File too small for 256-color palette: "
+                    f"{file_size} bytes "
+                    f"(need at least {128 + 769} bytes)"
+                )
+
+            # Seek to palette marker (769 bytes from end)
+            f.seek(-769, 2)
+
+            # Read and verify palette marker
+            marker = f.read(1)
+            if len(marker) == 0 or marker[0] != 0x0C:
+                raise InvalidPCXError(
+                    f"Missing or invalid 256-color palette marker. "
+                    f"Expected 0x0C, got 0x{marker[0]:02X} "
+                    f"at position {f.tell() - 1}"
+                    if marker
+                    else "Missing 256-color palette marker"
+                )
+
+            # Read 768 bytes of palette data
+            palette_data = f.read(768)
+            if len(palette_data) != 768:
+                raise InvalidPCXError(
+                    f"Incomplete palette data: "
+                    f"expected 768 bytes, got {len(palette_data)}"
+                )
+
+            # Return as list of integers
+            return list(palette_data)
+
+    except (IOError, OSError) as e:
+        raise PCXError(f"Failed to read palette from file: {e}")
