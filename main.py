@@ -23,7 +23,8 @@ from PyQt6.QtWidgets import (
 
 import point_processing as pp
 from pcx_header import PCXHeader
-from pcx_utils import create_palette_image, pcx_to_qimage
+from utils.filters import ndarray_to_qimage, qimage_to_ndarray
+from utils.pcx import create_palette_image, pcx_to_qimage
 
 
 class RightDockPanel(QWidget):
@@ -390,9 +391,9 @@ class ImageViewer(QMainWindow):
         if not self.image_label.image:
             return
 
-        arr = pp.qimage_to_ndarray(self.image_label.image)
+        arr = qimage_to_ndarray(self.image_label.image)
         result = func(arr, *args)
-        qimg = pp.ndarray_to_qimage(result)
+        qimg = ndarray_to_qimage(result)
         self.image_label.setImage(QPixmap.fromImage(qimg))
 
     def _process_with_greyscale(self, func, *args):
@@ -400,13 +401,13 @@ class ImageViewer(QMainWindow):
         if not self.image_label.image:
             return
 
-        arr = pp.qimage_to_ndarray(self.image_label.image)
+        arr = qimage_to_ndarray(self.image_label.image)
 
         if arr.ndim == 3:
             arr = pp.to_grayscale(arr)
 
         result = func(arr, *args)
-        qimg = pp.ndarray_to_qimage(result)
+        qimg = ndarray_to_qimage(result)
         self.image_label.setImage(QPixmap.fromImage(qimg))
 
     def apply_grayscale(self):
@@ -434,7 +435,7 @@ class ImageViewer(QMainWindow):
         if not self.image_label.image:
             return
 
-        arr = pp.qimage_to_ndarray(self.image_label.image)
+        arr = qimage_to_ndarray(self.image_label.image)
 
         # Check if image is grayscale or RGB
         if arr.ndim == 2:  # grayscale
@@ -449,7 +450,7 @@ class ImageViewer(QMainWindow):
             )
             return
 
-        qimg = pp.ndarray_to_qimage(result)
+        qimg = ndarray_to_qimage(result)
         self.image_label.setImage(QPixmap.fromImage(qimg))
 
 
