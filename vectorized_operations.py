@@ -48,3 +48,24 @@ def ndarray_to_qimage(arr: np.ndarray) -> QImage:
         raise ValueError(f"Unsupported array shape: {arr.shape}")
 
     return qimg.copy()  # return deep copy to avoid referencing numpy buffer
+
+
+def to_grayscale(rgb_points: np.ndarray) -> np.ndarray:
+    """Convert RGB point cloud to grayscale using luminosity method."""
+
+    if rgb_points.ndim not in (2, 3) or rgb_points.shape[-1] != 3:
+        raise ValueError("Input must be an array with 3 channels (RGB).")
+
+    # standard luminance coefficients for RGB to grayscale (Rec. 601)
+    RED_WEIGHT = 0.2989
+    GREEN_WEIGHT = 0.5870
+    BLUE_WEIGHT = 0.1140
+
+    # Apply weighted sum to get grayscale intensity
+    grayscale = (
+        RED_WEIGHT * rgb_points[..., 0]
+        + GREEN_WEIGHT * rgb_points[..., 1]
+        + BLUE_WEIGHT * rgb_points[..., 2]
+    )
+
+    return grayscale.astype(np.uint8)
