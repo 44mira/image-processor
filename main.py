@@ -1,24 +1,137 @@
 import os
 import sys
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QPixmap
+from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QIcon, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
     QScrollArea,
     QSplitter,
+    QStackedWidget,
     QStatusBar,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
 from pcx_header import PCXHeader
 from pcx_utils import create_palette_image, pcx_to_qimage
+
+
+class RightDockPanel(QWidget):
+    """A VS Code–style dockable side panel on the right, with icon buttons
+    and smooth slide animation."""
+
+    def __init__(self):
+        super().__init__()
+        self._expanded_width = 300
+        self._collapsed = False
+        self._anim = None
+        self.setMinimumWidth(50)
+        self.setStyleSheet("background-color: #2b2b2b; color: white;")
+
+        # --- main horizontal layout ---
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # --- sidebar with icons ---
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(50)
+        self.sidebar.setStyleSheet("background-color: #202020;")
+
+        self.sidebar_layout = QVBoxLayout(self.sidebar)
+        self.sidebar_layout.setContentsMargins(5, 10, 5, 10)
+        self.sidebar_layout.setSpacing(8)
+        self.sidebar_layout.addStretch()
+
+        # --- stack area for panels ---
+        self.stack = QStackedWidget()
+        self.stack.setStyleSheet("background-color: #2b2b2b;")
+        self.stack.setVisible(False)
+
+        # add to layout
+        main_layout.addWidget(self.stack, 1)
+        main_layout.addWidget(self.sidebar)
+
+        self.buttons = []
+        self.current_index = None
+
+    # ------------------------------------------------------------
+    def add_panel(
+        self, widget: QWidget, tooltip: str, icon_path: str | None = None
+    ):
+        """Add a new panel with an icon to the right sidebar."""
+        index = self.stack.addWidget(widget)
+
+        btn = QToolButton()
+        btn.setIcon(QIcon(icon_path) if icon_path else QIcon())
+        btn.setIconSize(QSize(22, 22))
+        btn.setToolTip(tooltip)
+        btn.setCheckable(True)
+        btn.clicked.connect(lambda: self._toggle_panel(index))
+        btn.setStyleSheet(
+            """
+            QToolButton {
+                background-color: transparent;
+                border: none;
+                padding: 6px;
+            }
+            QToolButton:checked {
+                background-color: #3a3d41;
+                border-radius: 6px;
+            }
+            QToolButton:hover {
+                background-color: #4b4f55;
+            }
+        """
+        )
+
+        self.sidebar_layout.insertWidget(len(self.buttons), btn)
+        self.buttons.append(btn)
+
+    # ------------------------------------------------------------
+    def _toggle_panel(self, index: int):
+        """Handle icon button click: toggle or switch panels."""
+        if self.current_index == index:
+            # collapse if same panel
+            self._collapse()
+            self.buttons[index].setChecked(False)
+            self.current_index = None
+        else:
+            if self.current_index is not None:
+                self.buttons[self.current_index].setChecked(False)
+            self.current_index = index
+            self.buttons[index].setChecked(True)
+            self.stack.setCurrentIndex(index)
+            self._expand()
+
+    # ------------------------------------------------------------
+    def _expand(self):
+        self.stack.setVisible(True)
+        anim = QPropertyAnimation(self, b"maximumWidth")
+        anim.setDuration(250)
+        anim.setStartValue(self.width())
+        anim.setEndValue(self._expanded_width)
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        anim.start()
+        self._anim = anim
+
+    def _collapse(self):
+        anim = QPropertyAnimation(self, b"maximumWidth")
+        anim.setDuration(250)
+        anim.setStartValue(self.width())
+        anim.setEndValue(50)  # keep just the icon bar visible
+        anim.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        anim.finished.connect(lambda: self.stack.setVisible(False))
+        anim.start()
+        self._anim = anim
 
 
 class ImageLabel(QLabel):
@@ -142,22 +255,21 @@ class ImageViewer(QMainWindow):
     def create_central_widget(self):
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Create splitter for main image and info panel
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left side: image viewer
         self.image_label = ImageLabel()
         self.image_label.pixelHovered.connect(self.update_info_bar)
         self.splitter.addWidget(self.image_label)
 
-        # Right side: PCX info panel (initially hidden)
-        self.pcx_info_panel = PCXInfoPanel()
-        self.pcx_info_panel.hide()
-        self.splitter.addWidget(self.pcx_info_panel)
+        self.right_panel = RightDockPanel()
+        self.splitter.addWidget(self.right_panel)
 
-        # Set initial sizes (70% image, 30% info)
         self.splitter.setSizes([700, 300])
+        self.splitter.setStretchFactor(0, 1)
+        self.splitter.setStretchFactor(1, 0)
 
         layout.addWidget(self.splitter)
         self.setCentralWidget(central_widget)
@@ -228,15 +340,22 @@ class ImageViewer(QMainWindow):
             )
             self.image_label.setImage(scaled_pixmap)
 
-            # Show PCX info panel
-            self.pcx_info_panel.set_pcx_info(header, file_path)
-            self.pcx_info_panel.show()
+            # Create PCX Info panel
+            pcx_panel = PCXInfoPanel()
+            pcx_panel.set_pcx_info(header, file_path)
+
+            # Add it as a tab in the right panel (auto-switches to this tab)
+            self.right_panel.add_panel(pcx_panel, "PCX Info", "icons/pcx.png")
 
             # Update window title
             self.setWindowTitle(f"PCX Viewer - {os.path.basename(file_path)}")
 
         except Exception as e:
-            raise Exception(f"Failed to load PCX file: {e}")
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to load PCX file: {str(e)}",
+            )
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
