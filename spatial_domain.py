@@ -1,5 +1,6 @@
 import numpy as np
 
+from point_processing import to_grayscale
 from utils.filters import convolve2d
 
 
@@ -65,3 +66,51 @@ def laplacian_highpass(image: np.ndarray) -> np.ndarray:
 #     laplacian = cv2.Laplacian(image, cv2.CV_64F, ksize=3)
 #     laplacian = cv2.convertScaleAbs(laplacian)
 #     return laplacian
+
+
+def unsharp_mask(image: np.ndarray, k: float = 1.0) -> np.ndarray:
+    """
+    Unsharp Mask occurs when `k` = 1, Highboost filter when `k` > 1.
+
+    Args:
+        image: The image to apply the filter to
+        k: Sharpening multiplier
+    """
+
+    if image.ndim == 3:
+        image = to_grayscale(image)
+
+    # apply blurring filter
+    blur_kernel = np.ones((3, 3), dtype=float) / 9.0
+    blurred = convolve2d(image, blur_kernel)
+
+    # subtract blur mask from grayscaled
+    mask = image - blurred
+
+    # add the mask back into the original image
+    sharpened = image + k * mask
+
+    sharpened = np.clip(sharpened, 0, 255)
+    return sharpened.astype(np.uint8)
+
+
+def sobel_magnitude(image: np.ndarray) -> np.ndarray:
+    if image.ndim == 3:
+        image = to_grayscale(image)
+
+    # kernel for horizontal edges
+    gx = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=float)
+
+    # kernel or vertical edges
+    gy = np.array([[-1, -2, -1], [0, 0, 0], [1, 2, 1]], dtype=float)
+
+    # convolve both kernels
+    grad_x = convolve2d(image, gx)
+    grad_y = convolve2d(image, gy)
+
+    # Compute magnitude of both gradients using distance formula
+    magnitude = np.sqrt(grad_x**2 + grad_y**2)
+
+    # interpolate into [0, 255] interval
+    magnitude = (magnitude / magnitude.max()) * 255
+    return magnitude.astype(np.uint8)

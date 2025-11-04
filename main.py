@@ -170,6 +170,18 @@ class ImageViewer(QMainWindow):
         lap_action.triggered.connect(self.apply_laplacian)
         filter_menu.addAction(lap_action)
 
+        unsharp_action = QAction("Unsharp Mask", self)
+        unsharp_action.triggered.connect(self.apply_unsharp_mask)
+        filter_menu.addAction(unsharp_action)
+
+        highboost_action = QAction("Highboost Filter", self)
+        highboost_action.triggered.connect(self.apply_highboost_filter)
+        filter_menu.addAction(highboost_action)
+
+        sobel_action = QAction("Sobel Magnitude Operator", self)
+        sobel_action.triggered.connect(self.apply_sobel_magnitude_gradient)
+        filter_menu.addAction(sobel_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
@@ -384,6 +396,31 @@ class ImageViewer(QMainWindow):
         if not self.image_label.image:
             return
         self._process_with_greyscale(sd.laplacian_highpass)
+
+    def apply_unsharp_mask(self):
+        if not self.image_label.image:
+            return
+        self._process_with_greyscale(sd.unsharp_mask)
+
+    def apply_highboost_filter(self):
+        if not self.image_label.image:
+            return
+        k, ok = QInputDialog.getDouble(
+            self,
+            "Highboost Filter",
+            "Enter k value (multiplier for sharpening):",
+            1.5,
+            1,
+        )
+
+        if ok:
+            self._process_with_greyscale(sd.unsharp_mask, k)
+
+    def apply_sobel_magnitude_gradient(self):
+        if not self.image_label.image:
+            return
+
+        self._process_with_greyscale(sd.sobel_magnitude)
 
 
 if __name__ == "__main__":
