@@ -197,11 +197,17 @@ class ImageViewer(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation,
                 )
 
-                self.image_label.setImage(scaled_pixmap)
+        try:
+            # Load image
+            pixmap = QPixmap(file_path)
 
-                self.setWindowTitle(
-                    f"Simple Image Viewer - {os.path.basename(file_path)}"
-                )
+            # Scale image to fit within the window while maintaining
+            # aspect ratio
+            scaled_pixmap = pixmap.scaled(
+                self.image_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
 
         except Exception as e:
             QMessageBox.critical(
