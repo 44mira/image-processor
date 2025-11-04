@@ -9,12 +9,16 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QScrollArea,
+    QSplitter,
     QStatusBar,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
 from pcx_header import PCXHeader
+from pcx_utils import create_palette_image, pcx_to_qimage
 
 
 class ImageLabel(QLabel):
@@ -66,6 +70,53 @@ class ImageLabel(QLabel):
         super().mouseMoveEvent(ev)
 
 
+class PCXInfoPanel(QWidget):
+    """Widget to display PCX header information and color palette"""
+
+    def __init__(self):
+        super().__init__()
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Header title
+        title = QLabel("<b>PCX Information</b>")
+        layout.addWidget(title)
+
+        # Header info text
+        self.header_text = QTextEdit()
+        self.header_text.setReadOnly(True)
+        self.header_text.setMaximumHeight(300)
+        layout.addWidget(QLabel("Header Information:"))
+        layout.addWidget(self.header_text)
+
+        # Palette visualization
+        layout.addWidget(QLabel("Color Palette:"))
+        self.palette_label = QLabel()
+        self.palette_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.palette_label.setStyleSheet("border: 1px solid gray;")
+
+        # Scroll area for palette
+        scroll = QScrollArea()
+        scroll.setWidget(self.palette_label)
+        scroll.setWidgetResizable(True)
+        layout.addWidget(scroll)
+
+    def set_pcx_info(self, header: PCXHeader, file_path: str):
+        """Update panel with PCX header information and palette"""
+        # Set header text
+        self.header_text.setPlainText(str(header))
+
+        # Create and set palette image
+        try:
+            palette_img = create_palette_image(file_path, header)
+            pixmap = QPixmap.fromImage(palette_img)
+            self.palette_label.setPixmap(pixmap)
+        except Exception as e:
+            self.palette_label.setText(f"Failed to load palette: {e}")
+
+
 class ImageViewer(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -92,10 +143,23 @@ class ImageViewer(QMainWindow):
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
 
+        # Create splitter for main image and info panel
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Left side: image viewer
         self.image_label = ImageLabel()
         self.image_label.pixelHovered.connect(self.update_info_bar)
-        layout.addWidget(self.image_label, stretch=1)
+        self.splitter.addWidget(self.image_label)
 
+        # Right side: PCX info panel (initially hidden)
+        self.pcx_info_panel = PCXInfoPanel()
+        self.pcx_info_panel.hide()
+        self.splitter.addWidget(self.pcx_info_panel)
+
+        # Set initial sizes (70% image, 30% info)
+        self.splitter.setSizes([700, 300])
+
+        layout.addWidget(self.splitter)
         self.setCentralWidget(central_widget)
 
     def create_info_bar(self):
@@ -116,9 +180,22 @@ class ImageViewer(QMainWindow):
         if not file_path:
             return
 
-        if file_path[-4:].lower() == ".pcx":
-            self.open_pcx(file_path)
-            return
+        try:
+            # Check if it's a PCX file
+            if file_path[-4:].lower() == ".pcx":
+                self.open_pcx_file(file_path)
+            else:
+                # Load regular image
+                self.pcx_info_panel.hide()
+                pixmap = QPixmap(file_path)
+
+                # Scale image to fit within the window while maintaining
+                # aspect ratio
+                scaled_pixmap = pixmap.scaled(
+                    self.image_label.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
 
         try:
             # Load image
@@ -132,12 +209,6 @@ class ImageViewer(QMainWindow):
                 Qt.TransformationMode.SmoothTransformation,
             )
 
-            self.image_label.setImage(scaled_pixmap)
-
-            self.setWindowTitle(
-                f"Simple Image Viewer - {os.path.basename(file_path)}"
-            )
-
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -145,10 +216,33 @@ class ImageViewer(QMainWindow):
                 f"Failed to open image: {str(e)}",
             )
 
-    def open_pcx(self, file_path):
-        PCXHeader.parse_pcx_header(file_path)
+    def open_pcx_file(self, file_path: str):
+        """Load and display a PCX file with info panel"""
+        try:
+            # Parse PCX header
+            header = PCXHeader.parse_pcx_header(file_path)
 
-        # TODO: integration
+            # Convert to QImage
+            qimage = pcx_to_qimage(file_path, header)
+
+            # Convert to QPixmap and display
+            pixmap = QPixmap.fromImage(qimage)
+            scaled_pixmap = pixmap.scaled(
+                self.image_label.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            self.image_label.setImage(scaled_pixmap)
+
+            # Show PCX info panel
+            self.pcx_info_panel.set_pcx_info(header, file_path)
+            self.pcx_info_panel.show()
+
+            # Update window title
+            self.setWindowTitle(f"PCX Viewer - {os.path.basename(file_path)}")
+
+        except Exception as e:
+            raise Exception(f"Failed to load PCX file: {e}")
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
