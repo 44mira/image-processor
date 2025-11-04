@@ -73,3 +73,13 @@ def to_negative(rgb_points: np.ndarray) -> np.ndarray:
 
     negative = 255 - rgb_points
     return negative.astype(np.uint8)
+
+
+def manual_threshold(intensities: np.ndarray, threshold: int) -> np.ndarray:
+    """
+    Convert intensities to black or white based on a manual threshold.
+    """
+    if not 0 <= threshold <= 255:
+        raise ValueError("Threshold must be in range [0, 255].")
+
+    return np.where(intensities >= threshold, 255, 0).astype(np.uint8)

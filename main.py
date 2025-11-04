@@ -6,6 +6,7 @@ from PyQt6.QtGui import QAction, QPixmap
 from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -140,6 +141,10 @@ class ImageViewer(QMainWindow):
         negative_action.triggered.connect(self.apply_negative)
         filter_menu.addAction(negative_action)
 
+        threshold_action = QAction("Manual Threshold", self)
+        threshold_action.triggered.connect(self.apply_threshold)
+        filter_menu.addAction(threshold_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
@@ -268,6 +273,20 @@ class ImageViewer(QMainWindow):
 
     def apply_negative(self):
         self._process_current_image(pp.to_negative)
+
+    def apply_threshold(self):
+        threshold, ok = QInputDialog.getInt(
+            self, "Threshold", "Enter threshold (0–255):", 128, 0, 255
+        )
+        if ok:
+            arr = pp.qimage_to_ndarray(self.image_label.image)
+
+            if arr.ndim == 3:
+                arr = pp.to_grayscale(arr)
+            result = pp.manual_threshold(arr, threshold)
+
+            qimg = pp.ndarray_to_qimage(result)
+            self.image_label.setImage(QPixmap.fromImage(qimg))
 
 
 if __name__ == "__main__":
