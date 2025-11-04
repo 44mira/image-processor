@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+import point_processing as pp
 from pcx_header import PCXHeader
 from pcx_utils import create_palette_image, pcx_to_qimage
 
@@ -133,11 +134,15 @@ class ImageViewer(QMainWindow):
         assert menubar is not None
 
         file_menu = menubar.addMenu("File")
-        assert file_menu is not None
-
         open_action = QAction("Open New Image File", self)
         open_action.triggered.connect(self.open_image)
         file_menu.addAction(open_action)
+
+        filter_menu = menubar.addMenu("Filter")
+
+        grayscale_action = QAction("Grayscale", self)
+        grayscale_action.triggered.connect(self.apply_grayscale)
+        filter_menu.addAction(grayscale_action)
 
     def create_central_widget(self):
         central_widget = QWidget()
@@ -240,6 +245,19 @@ class ImageViewer(QMainWindow):
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
+
+    def _process_current_image(self, func, *args):
+        """Helper: convert image → ndarray, apply func, convert back."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+        result = func(arr, *args)
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
+
+    def apply_grayscale(self):
+        self._process_current_image(pp.to_grayscale)
 
 
 if __name__ == "__main__":
