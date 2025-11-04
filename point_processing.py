@@ -76,10 +76,27 @@ def to_negative(rgb_points: np.ndarray) -> np.ndarray:
 
 
 def manual_threshold(intensities: np.ndarray, threshold: int) -> np.ndarray:
-    """
-    Convert intensities to black or white based on a manual threshold.
-    """
+    """Convert intensities to black or white based on a manual threshold."""
     if not 0 <= threshold <= 255:
         raise ValueError("Threshold must be in range [0, 255].")
 
     return np.where(intensities >= threshold, 255, 0).astype(np.uint8)
+
+
+def gamma_transform(
+    image: np.ndarray, gamma: float, c: float = 1.0
+) -> np.ndarray:
+    """Apply Power-Law (Gamma) transformation to an RGB image."""
+    if gamma <= 0:
+        raise ValueError("Gamma must be greater than 0.")
+
+    # Normalize to [0, 1]
+    norm = image / 255.0
+
+    # Apply power-law transformation per channel
+    corrected = c * np.power(norm, gamma)
+
+    # Rescale back to [0, 255]
+    corrected = np.clip(corrected * 255.0, 0, 255).astype(np.uint8)
+
+    return corrected

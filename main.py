@@ -145,6 +145,10 @@ class ImageViewer(QMainWindow):
         threshold_action.triggered.connect(self.apply_threshold)
         filter_menu.addAction(threshold_action)
 
+        gamma_action = QAction("Gamma Correction", self)
+        gamma_action.triggered.connect(self.apply_gamma)
+        filter_menu.addAction(gamma_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
@@ -268,6 +272,20 @@ class ImageViewer(QMainWindow):
         qimg = pp.ndarray_to_qimage(result)
         self.image_label.setImage(QPixmap.fromImage(qimg))
 
+    def _process_with_greyscale(self, func, *args):
+        """Helper: ensure greyscale input before processing."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+
+        if arr.ndim == 3:
+            arr = pp.to_grayscale(arr)
+
+        result = func(arr, *args)
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
+
     def apply_grayscale(self):
         self._process_current_image(pp.to_grayscale)
 
@@ -279,14 +297,14 @@ class ImageViewer(QMainWindow):
             self, "Threshold", "Enter threshold (0–255):", 128, 0, 255
         )
         if ok:
-            arr = pp.qimage_to_ndarray(self.image_label.image)
+            self._process_with_greyscale(pp.manual_threshold, threshold)
 
-            if arr.ndim == 3:
-                arr = pp.to_grayscale(arr)
-            result = pp.manual_threshold(arr, threshold)
-
-            qimg = pp.ndarray_to_qimage(result)
-            self.image_label.setImage(QPixmap.fromImage(qimg))
+    def apply_gamma(self):
+        gamma, ok = QInputDialog.getDouble(
+            self, "Gamma", "Enter gamma value (>0):", 1.0, 0.1, float("inf"), 2
+        )
+        if ok:
+            self._process_current_image(pp.gamma_transform, gamma)
 
 
 if __name__ == "__main__":
