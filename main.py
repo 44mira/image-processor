@@ -1,6 +1,9 @@
 import os
 import sys
 
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QPixmap
 from PyQt6.QtWidgets import (
@@ -21,6 +24,7 @@ from PyQt6.QtWidgets import (
 import point_processing as pp
 from pcx_header import PCXHeader
 from pcx_utils import create_palette_image, pcx_to_qimage
+from vectorized_operations import get_histogram
 
 
 class ImageLabel(QLabel):
@@ -164,6 +168,13 @@ class ImageViewer(QMainWindow):
 
         self._filter_menu(menubar)
 
+        enhancement_menu = menubar.addMenu("Enhancement")
+        assert enhancement_menu is not None
+
+        histogram_action = QAction("Histogram", self)
+        histogram_action.triggered.connect(self.create_histogram)
+        enhancement_menu.addAction(histogram_action)
+
     def create_central_widget(self):
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
@@ -228,6 +239,8 @@ class ImageViewer(QMainWindow):
                     f"Simple Image Viewer - {os.path.basename(file_path)}"
                 )
 
+            # clear existing states
+            self.cleanup()
         except Exception as e:
             QMessageBox.critical(
                 self,
@@ -265,6 +278,70 @@ class ImageViewer(QMainWindow):
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
+
+    def create_histogram(self):
+        assert self.image_label.image
+        channels = pp.qimage_to_ndarray(self.image_label.image)
+
+        # remove existing histogram canvas
+        if hasattr(self, "hist_canvas") and self.hist_canvas is not None:
+            self.splitter.widget(
+                self.splitter.indexOf(self.hist_canvas)
+            ).setParent(None)
+            self.hist_canvas.deleteLater()
+            self.hist_canvas = None
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+        if channels.ndim == 3:
+            hist_r, _ = get_histogram(channels[..., 0])
+            hist_g, _ = get_histogram(channels[..., 1])
+            hist_b, _ = get_histogram(channels[..., 2])
+
+            ax.step(
+                np.arange(256), hist_r, where="mid", color="red", label="Red"
+            )
+            ax.step(
+                np.arange(256),
+                hist_g,
+                where="mid",
+                color="green",
+                label="Green",
+            )
+            ax.step(
+                np.arange(256), hist_b, where="mid", color="blue", label="Blue"
+            )
+        elif channels.ndim == 2:
+            hist = get_histogram(channels)
+
+            ax.step(
+                np.arange(256),
+                hist,
+                where="mid",
+                color="black",
+                label="Luminance",
+            )
+
+        plt.xlim(0, 255)
+        plt.xlabel("Intensity")
+        plt.ylabel("Frequency")
+
+        self.hist_canvas = FigureCanvasQTAgg(fig)
+        self.splitter.addWidget(self.hist_canvas)
+
+    def cleanup(self):
+        """
+        Cleanup previous operations before loading an image.
+        """
+
+        # remove existing histogram canvas
+        if hasattr(self, "hist_canvas") and self.hist_canvas is not None:
+            self.splitter.widget(
+                self.splitter.indexOf(self.hist_canvas)
+            ).setParent(None)
+            self.hist_canvas.deleteLater()
+            self.hist_canvas = None
 
     def _process_current_image(self, func, *args):
         """Helper: convert image → ndarray, apply func, convert back."""
