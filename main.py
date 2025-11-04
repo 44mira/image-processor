@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 import point_processing as pp
+import spatial_domain as sd
 from pcx_header import PCXHeader
 from utils.filters import ndarray_to_qimage, qimage_to_ndarray
 from utils.pcx import create_palette_image, pcx_to_qimage
@@ -153,6 +154,21 @@ class ImageViewer(QMainWindow):
         histogram_action = QAction("Histogram Equalization", self)
         histogram_action.triggered.connect(self.apply_histogram)
         filter_menu.addAction(histogram_action)
+
+        # --- New: Smoothing and Laplacian filters ---
+        filter_menu.addSeparator()
+
+        avg_action = QAction("Averaging Filter", self)
+        avg_action.triggered.connect(self.apply_averaging)
+        filter_menu.addAction(avg_action)
+
+        median_action = QAction("Median Filter", self)
+        median_action.triggered.connect(self.apply_median)
+        filter_menu.addAction(median_action)
+
+        lap_action = QAction("Laplacian Highpass", self)
+        lap_action.triggered.connect(self.apply_laplacian)
+        filter_menu.addAction(lap_action)
 
     def create_menu(self):
         menubar = self.menuBar()
@@ -333,6 +349,41 @@ class ImageViewer(QMainWindow):
 
         qimg = ndarray_to_qimage(result)
         self.image_label.setImage(QPixmap.fromImage(qimg))
+
+    def apply_averaging(self):
+        if not self.image_label.image:
+            return
+        ksize, ok = QInputDialog.getInt(
+            self,
+            "Averaging Filter",
+            "Enter kernel size (odd number):",
+            3,
+            1,
+            15,
+            2,
+        )
+        if ok:
+            self._process_current_image(sd.averaging_filter, ksize)
+
+    def apply_median(self):
+        if not self.image_label.image:
+            return
+        ksize, ok = QInputDialog.getInt(
+            self,
+            "Median Filter",
+            "Enter kernel size (odd number):",
+            3,
+            1,
+            15,
+            2,
+        )
+        if ok:
+            self._process_current_image(sd.median_filter, ksize)
+
+    def apply_laplacian(self):
+        if not self.image_label.image:
+            return
+        self._process_with_greyscale(sd.laplacian_highpass)
 
 
 if __name__ == "__main__":
