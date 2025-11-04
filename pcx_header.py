@@ -7,6 +7,7 @@ PCX header is always 128 bytes at the start of the file.
 Reference: ZSoft PCX File Format Technical Reference Manual
 """
 
+import io
 import struct
 from dataclasses import dataclass
 from typing import Self
@@ -324,7 +325,7 @@ def read_256_color_palette(file_path: str) -> list[int]:
                 )
 
             # Seek to palette marker (769 bytes from end)
-            f.seek(-769, 2)
+            f.seek(-769, io.SEEK_END)
 
             # Read and verify palette marker
             marker = f.read(1)
