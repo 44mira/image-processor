@@ -313,7 +313,7 @@ def read_256_color_palette(file_path: str) -> list[int]:
     try:
         with open(file_path, "rb") as f:
             # Get file size
-            f.seek(0, 2)  # Seek to end
+            f.seek(0, io.SEEK_END)  # Seek to end
             file_size = f.tell()
 
             # Check if file is large enough to contain palette
