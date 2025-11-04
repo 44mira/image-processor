@@ -129,6 +129,17 @@ class ImageViewer(QMainWindow):
         self.create_central_widget()
         self.create_info_bar()
 
+    def _filter_menu(self, menubar):
+        filter_menu = menubar.addMenu("Filter")
+
+        grayscale_action = QAction("Grayscale", self)
+        grayscale_action.triggered.connect(self.apply_grayscale)
+        filter_menu.addAction(grayscale_action)
+
+        negative_action = QAction("Negative", self)
+        negative_action.triggered.connect(self.apply_negative)
+        filter_menu.addAction(negative_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
@@ -138,11 +149,7 @@ class ImageViewer(QMainWindow):
         open_action.triggered.connect(self.open_image)
         file_menu.addAction(open_action)
 
-        filter_menu = menubar.addMenu("Filter")
-
-        grayscale_action = QAction("Grayscale", self)
-        grayscale_action.triggered.connect(self.apply_grayscale)
-        filter_menu.addAction(grayscale_action)
+        self._filter_menu(menubar)
 
     def create_central_widget(self):
         central_widget = QWidget()
@@ -258,6 +265,9 @@ class ImageViewer(QMainWindow):
 
     def apply_grayscale(self):
         self._process_current_image(pp.to_grayscale)
+
+    def apply_negative(self):
+        self._process_current_image(pp.to_negative)
 
 
 if __name__ == "__main__":

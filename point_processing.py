@@ -64,3 +64,12 @@ def to_grayscale(rgb_points: np.ndarray) -> np.ndarray:
     )
 
     return grayscale.astype(np.uint8)
+
+
+def to_negative(rgb_points: np.ndarray) -> np.ndarray:
+    """Convert RGB point cloud to its negative."""
+    if rgb_points.ndim not in (2, 3) or rgb_points.shape[-1] != 3:
+        raise ValueError("Input must be an array with 3 channels (RGB).")
+
+    negative = 255 - rgb_points
+    return negative.astype(np.uint8)
