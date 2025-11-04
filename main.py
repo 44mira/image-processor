@@ -149,6 +149,10 @@ class ImageViewer(QMainWindow):
         gamma_action.triggered.connect(self.apply_gamma)
         filter_menu.addAction(gamma_action)
 
+        histogram_action = QAction("Histogram Equalization", self)
+        histogram_action.triggered.connect(self.apply_histogram)
+        filter_menu.addAction(histogram_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
@@ -305,6 +309,29 @@ class ImageViewer(QMainWindow):
         )
         if ok:
             self._process_current_image(pp.gamma_transform, gamma)
+
+    def apply_histogram(self):
+        """Apply histogram equalization to the current image."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+
+        # Check if image is grayscale or RGB
+        if arr.ndim == 2:  # grayscale
+            result = pp.histogram_equalization(arr)
+        elif arr.ndim == 3 and arr.shape[2] == 3:  # color
+            result = pp.histogram_equalization_rgb(arr)
+        else:
+            QMessageBox.warning(
+                self,
+                "Unsupported Format",
+                "Only grayscale or RGB images are supported.",
+            )
+            return
+
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
 
 
 if __name__ == "__main__":

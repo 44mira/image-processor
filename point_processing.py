@@ -10,6 +10,7 @@ For methods (3) and (4), allow the user to select a threshold value
 from range [0, 255] and gamma (γ) values, respectively.
 """
 
+import cv2
 import numpy as np
 from PyQt6.QtGui import QImage
 
@@ -100,3 +101,68 @@ def gamma_transform(
     corrected = np.clip(corrected * 255.0, 0, 255).astype(np.uint8)
 
     return corrected
+
+
+def histogram_equalization(image: np.ndarray) -> np.ndarray:
+    """Perform histogram equalization on a grayscale image."""
+    if len(image.shape) == 3:
+        # Convert RGB to grayscale for histogram equalization
+        image = np.dot(image[..., :3], [0.2989, 0.5870, 0.1140]).astype(
+            np.uint8
+        )
+
+    # 1. Find range of intensity values
+    min_intensity = np.min(image)
+    max_intensity = np.max(image)
+    intensity_range = max_intensity - min_intensity + 1
+
+    # 2. Find frequency (histogram)
+    hist, _bins = np.histogram(
+        image.flatten(),
+        bins=intensity_range,
+        range=(min_intensity, max_intensity + 1),
+    )
+
+    # 3. Probability Density Function (PDF)
+    pdf = hist / np.sum(hist)
+
+    # 4. Cumulative Density Function (CDF)
+    cdf = np.cumsum(pdf)
+
+    # 5. Multiply by highest intensity value
+    cdf_scaled = cdf * max_intensity
+
+    # 6. Round off values
+    cdf_rounded = np.round(cdf_scaled).astype(np.uint8)
+
+    # Map old intensities to new equalized values
+    equalized_image = cdf_rounded[image - min_intensity]
+
+    return equalized_image
+
+
+def histogram_equalization_rgb(image: np.ndarray) -> np.ndarray:
+    """
+    Perform histogram equalization on a color (RGB) image by
+    converting it to HSV and equalizing only the Value (V) channel.
+    """
+    if image.ndim == 2:
+        # Already grayscale
+        return histogram_equalization(image)
+
+    # Convert RGB → HSV
+    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+    # Split into channels
+    h, s, v = cv2.split(hsv)
+
+    # Apply manual histogram equalization to the V channel
+    v_eq = histogram_equalization(v)
+
+    # Merge back the channels
+    hsv_eq = cv2.merge([h, s, v_eq])
+
+    # Convert back to RGB
+    rgb_eq = cv2.cvtColor(hsv_eq, cv2.COLOR_HSV2RGB)
+
+    return rgb_eq
