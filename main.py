@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QFileDialog,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -20,6 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+import point_processing as pp
 from pcx_header import PCXHeader
 from pcx_utils import create_palette_image, pcx_to_qimage
 
@@ -241,16 +243,39 @@ class ImageViewer(QMainWindow):
         self.create_central_widget()
         self.create_info_bar()
 
+    def _filter_menu(self, menubar):
+        filter_menu = menubar.addMenu("Filter")
+
+        grayscale_action = QAction("Grayscale", self)
+        grayscale_action.triggered.connect(self.apply_grayscale)
+        filter_menu.addAction(grayscale_action)
+
+        negative_action = QAction("Negative", self)
+        negative_action.triggered.connect(self.apply_negative)
+        filter_menu.addAction(negative_action)
+
+        threshold_action = QAction("Manual Threshold", self)
+        threshold_action.triggered.connect(self.apply_threshold)
+        filter_menu.addAction(threshold_action)
+
+        gamma_action = QAction("Gamma Correction", self)
+        gamma_action.triggered.connect(self.apply_gamma)
+        filter_menu.addAction(gamma_action)
+
+        histogram_action = QAction("Histogram Equalization", self)
+        histogram_action.triggered.connect(self.apply_histogram)
+        filter_menu.addAction(histogram_action)
+
     def create_menu(self):
         menubar = self.menuBar()
         assert menubar is not None
 
         file_menu = menubar.addMenu("File")
-        assert file_menu is not None
-
         open_action = QAction("Open New Image File", self)
         open_action.triggered.connect(self.open_image)
         file_menu.addAction(open_action)
+
+        self._filter_menu(menubar)
 
     def create_central_widget(self):
         central_widget = QWidget()
@@ -359,6 +384,73 @@ class ImageViewer(QMainWindow):
 
     def update_info_bar(self, x, y, r, g, b):
         self.info_bar.showMessage(f"X:{x}, Y:{y}  RGB:({r}, {g}, {b})")
+
+    def _process_current_image(self, func, *args):
+        """Helper: convert image → ndarray, apply func, convert back."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+        result = func(arr, *args)
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
+
+    def _process_with_greyscale(self, func, *args):
+        """Helper: ensure greyscale input before processing."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+
+        if arr.ndim == 3:
+            arr = pp.to_grayscale(arr)
+
+        result = func(arr, *args)
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
+
+    def apply_grayscale(self):
+        self._process_current_image(pp.to_grayscale)
+
+    def apply_negative(self):
+        self._process_current_image(pp.to_negative)
+
+    def apply_threshold(self):
+        threshold, ok = QInputDialog.getInt(
+            self, "Threshold", "Enter threshold (0–255):", 128, 0, 255
+        )
+        if ok:
+            self._process_with_greyscale(pp.manual_threshold, threshold)
+
+    def apply_gamma(self):
+        gamma, ok = QInputDialog.getDouble(
+            self, "Gamma", "Enter gamma value (>0):", 1.0, 0.1, float("inf"), 2
+        )
+        if ok:
+            self._process_current_image(pp.gamma_transform, gamma)
+
+    def apply_histogram(self):
+        """Apply histogram equalization to the current image."""
+        if not self.image_label.image:
+            return
+
+        arr = pp.qimage_to_ndarray(self.image_label.image)
+
+        # Check if image is grayscale or RGB
+        if arr.ndim == 2:  # grayscale
+            result = pp.histogram_equalization(arr)
+        elif arr.ndim == 3 and arr.shape[2] == 3:  # color
+            result = pp.histogram_equalization_rgb(arr)
+        else:
+            QMessageBox.warning(
+                self,
+                "Unsupported Format",
+                "Only grayscale or RGB images are supported.",
+            )
+            return
+
+        qimg = pp.ndarray_to_qimage(result)
+        self.image_label.setImage(QPixmap.fromImage(qimg))
 
 
 if __name__ == "__main__":
