@@ -31,3 +31,24 @@ def ndarray_to_qimage(arr: np.ndarray) -> QImage:
         raise ValueError(f"Unsupported array shape: {arr.shape}")
 
     return qimg.copy()  # return deep copy to avoid referencing numpy buffer
+
+
+def convolve2d(image: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+    """Perform 2D convolution on a single-channel image (grayscale)."""
+    kh, kw = kernel.shape
+    pad_y, pad_x = kh // 2, kw // 2
+
+    # Pad the image to handle borders
+    padded = np.pad(image, ((pad_y, pad_y), (pad_x, pad_x)), mode="reflect")
+    output = np.zeros_like(image, dtype=float)
+
+    # Flip kernel (for convolution)
+    kernel_flipped = np.flipud(np.fliplr(kernel))
+
+    # Convolve
+    for y in range(image.shape[0]):
+        for x in range(image.shape[1]):
+            region = padded[y : y + kh, x : x + kw]
+            output[y, x] = np.sum(region * kernel_flipped)
+
+    return output
